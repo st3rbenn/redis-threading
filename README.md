@@ -1,121 +1,115 @@
-# node-typescript-boilerplate
+# Redis Threading
 
-[![Sponsor][sponsor-badge]][sponsor]
-[![TypeScript version][ts-badge]][typescript-5-7]
-[![Node.js version][nodejs-badge]][nodejs]
-[![APLv2][license-badge]][license]
-[![Build Status - GitHub Actions][gha-badge]][gha-ci]
+Une bibliothèque robuste de multithreading pour Node.js/TypeScript utilisant Redis comme support pour la communication, la synchronisation et la mise en file d'attente des tâches.
 
-👩🏻‍💻 Developer Ready: A comprehensive template. Works out of the box for most [Node.js][nodejs] projects.
+## Caractéristiques
 
-🏃🏽 Instant Value: All basic tools included and configured:
+- **Pool de Workers** - Gestion efficace de worker threads pour les calculs parallèles
+- **File d'Attente Distribuée** - Distribution et synchronisation des tâches via Redis
+- **Communication Inter-Processus** - Communication Pub/Sub entre les nœuds
+- **État Partagé** - Partage de données entre les processus avec notifications de changement
+- **Verrous Distribués** - Synchronisation de sections critiques entre plusieurs instances
+- **Monitoring** - Surveillance de la santé et des performances du système
+- **Hautement Évolutif** - Conception pour une scalabilité horizontale et verticale
 
-- [TypeScript][typescript] [5.7][typescript-5-7]
-- [ESM][esm]
-- [ESLint][eslint] with some initial rules recommendation
-- [Vitest][vitest] for fast unit testing and code coverage
-- Type definitions for Node.js
-- [Prettier][prettier] to enforce consistent code style
-- NPM [scripts](#available-scripts) for common operations
-- [EditorConfig][editorconfig] for consistent coding style
-- Reproducible environments thanks to [Volta][volta]
-- Example configuration for [GitHub Actions][gh-actions]
-- Simple example of TypeScript code and unit test
+## Installation
 
-🤲 Free as in speech: available under the APLv2 license.
-
-## Getting Started
-
-This project is intended to be used with the latest Active LTS release of [Node.js][nodejs].
-
-### Use as a repository template
-
-To start, just click the **[Use template][repo-template-action]** link (or the green button). Start adding your code in the `src` and unit tests in the `__tests__` directories.
-
-### Clone repository
-
-To clone the repository, use the following commands:
-
-```sh
-git clone https://github.com/jsynowiec/node-typescript-boilerplate
-cd node-typescript-boilerplate
-npm install
+```bash
+npm install redis-threading
 ```
 
-### Download latest release
-
-Download and unzip the current **main** branch or one of the tags:
-
-```sh
-wget https://github.com/jsynowiec/node-typescript-boilerplate/archive/main.zip -O node-typescript-boilerplate.zip
-unzip node-typescript-boilerplate.zip && rm node-typescript-boilerplate.zip
+```bash
+yarn add redis-threading
 ```
 
-## Available Scripts
+```bash
+bun install redis-threading
+```
 
-- `clean` - remove coverage data, cache and transpiled files,
-- `prebuild` - lint source files and tests before building,
-- `build` - transpile TypeScript to ES6,
-- `build:watch` - interactive watch mode to automatically transpile source files,
-- `lint` - lint source files and tests,
-- `prettier` - reformat files,
-- `test` - run tests,
-- `test:watch` - interactive watch mode to automatically re-run tests
-- `test:coverage` - run test and print out test coverage
+```bash
+pnpm install redis-threading
+```
 
-## Additional Information
+## Prérequis
 
-### Why include Volta
+- Node.js >= 16.0.0
+- Redis Server >= 5.0.0
 
-I recommend to [install][volta-getting-started] Volta and use it to manage your project's toolchain.
+## Utilisation Rapide
 
-[Volta][volta]’s toolchain always keeps track of where you are, it makes sure the tools you use always respect the settings of the project you’re working on. This means you don’t have to worry about changing the state of your installed software when switching between projects. For example, it's [used by engineers at LinkedIn][volta-tomdale] to standardize tools and have reproducible development environments.
+```typescript
+import RedisThreading from 'redis-threading';
+import * as path from 'path';
 
-### Why Vitest instead of Jest
+async function main() {
+  // Créer une instance avec la configuration
+  const rt = new RedisThreading({
+    redis: {
+      host: 'localhost',
+      port: 6379,
+      password: '',
+      db: 0,
+    },
+    namespace: 'myapp',
+  });
 
-I recommend using [Vitest][vitest] for unit and integration testing of your TypeScript code.
+  // Initialiser la bibliothèque
+  await rt.initialize();
 
-In 2023, my team and I gradually switched from Jest to [Vitest][vitest] in all the projects. We've found out that generally, Vitest is faster than Jest, especially for large test suits. Furthermore, Vitest has native support for ES modules, is easier to configure, and has a much nicer developer experience when used with TypeScript. For example, when working with mocks, spies and types.
+  // Initialiser le worker pool
+  await rt.initializeWorkerPool(path.resolve(__dirname, './worker.js'));
 
-Nevertheless, the choice of specific tooling always depends on the specific requirements and characteristics of the project.
+  // Enregistrer des handlers de tâches
+  rt.registerTaskHandler('math:add', async (data) => {
+    return { result: data.a + data.b };
+  });
 
-### ES Modules
+  // Démarrer le consommateur de files d'attente
+  rt.startQueueConsumer(2, ['default']);
 
-This template uses native [ESM][esm]. Make sure to read [this][nodejs-esm], and [this][ts47-esm] first.
+  // Exécuter une tâche localement
+  const result = await rt.executeTask('math:add', { a: 5, b: 3 });
+  console.log('Résultat:', result.result);
 
-If your project requires CommonJS, you will have to [convert to ESM][sindresorhus-esm].
+  // Soumettre une tâche à la file d'attente Redis
+  rt.enqueueTask('math:multiply', { a: 4, b: 7 }).then((result) =>
+    console.log('Résultat:', result.result)
+  );
 
-Please do not open issues for questions regarding CommonJS or ESM on this repo.
+  // Partager des données
+  await rt.setState('counter', 1);
 
-## Backers & Sponsors
+  // S'abonner aux changements
+  rt.onStateChange('counter', (newValue) => {
+    console.log('Nouveau compteur:', newValue);
+  });
 
-Support this project by becoming a [sponsor][sponsor].
+  // Fermeture propre
+  process.on('SIGINT', async () => {
+    await rt.shutdown();
+    process.exit(0);
+  });
+}
 
-## License
+main().catch(console.error);
+```
 
-Licensed under the APLv2. See the [LICENSE](https://github.com/jsynowiec/node-typescript-boilerplate/blob/main/LICENSE) file for details.
+## Documentation Complète
 
-[ts-badge]: https://img.shields.io/badge/TypeScript-5.7-blue.svg
-[nodejs-badge]: https://img.shields.io/badge/Node.js-22-blue.svg
-[nodejs]: https://nodejs.org/dist/latest-v22.x/docs/api/
-[gha-badge]: https://github.com/jsynowiec/node-typescript-boilerplate/actions/workflows/nodejs.yml/badge.svg
-[gha-ci]: https://github.com/jsynowiec/node-typescript-boilerplate/actions/workflows/nodejs.yml
-[typescript]: https://www.typescriptlang.org/
-[typescript-5-7]: https://devblogs.microsoft.com/typescript/announcing-typescript-5-7/
-[license-badge]: https://img.shields.io/badge/license-APLv2-blue.svg
-[license]: https://github.com/jsynowiec/node-typescript-boilerplate/blob/main/LICENSE
-[sponsor-badge]: https://img.shields.io/badge/♥-Sponsor-fc0fb5.svg
-[sponsor]: https://github.com/sponsors/jsynowiec
-[eslint]: https://github.com/eslint/eslint
-[prettier]: https://prettier.io
-[volta]: https://volta.sh
-[volta-getting-started]: https://docs.volta.sh/guide/getting-started
-[volta-tomdale]: https://twitter.com/tomdale/status/1162017336699838467
-[gh-actions]: https://github.com/features/actions
-[repo-template-action]: https://github.com/jsynowiec/node-typescript-boilerplate/generate
-[esm]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
-[sindresorhus-esm]: https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c
-[nodejs-esm]: https://nodejs.org/docs/latest-v16.x/api/esm.html
-[ts47-esm]: https://devblogs.microsoft.com/typescript/announcing-typescript-4-7/#esm-nodejs
-[editorconfig]: https://editorconfig.org
-[vitest]: https://vitest.dev
+Pour une documentation complète incluant tous les concepts avancés, consultez le [Wiki](https://github.com/yourusername/redis-threading/wiki).
+
+## Design Patterns Utilisés
+
+Cette bibliothèque implémente plusieurs design patterns pour une architecture propre et maintenable :
+
+- **Singleton** - Pour les gestionnaires globaux (WorkerPool, QueueManager, etc.)
+- **Factory** - Pour la création d'objets complexes (RedisClientFactory)
+- **Repository** - Pour l'abstraction des accès aux données (TaskQueue)
+- **Observer** - Pour les notifications d'événements (MessageBroker, SharedState)
+- **Command** - Pour l'encapsulation des actions (TaskExecutor)
+- **Strategy** - Pour les différentes stratégies de distribution des tâches
+- **Façade** - Pour une interface simplifiée (RedisThreading)
+
+## Licence
+
+MIT

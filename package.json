@@ -1,48 +1,50 @@
 {
-  "name": "node-typescript-boilerplate",
-  "version": "0.0.0",
-  "description": "Minimalistic boilerplate to quick-start Node.js development in TypeScript.",
-  "type": "module",
-  "engines": {
-    "node": ">= 22.11 < 23"
+  "name": "redis-threading",
+  "version": "1.0.0",
+  "description": "Bibliothèque de multithreading avec Redis pour Node.js/TypeScript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "rimraf dist",
+    "lint": "eslint --ext .ts src/",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "vitest",
+    "prepare": "bun run build",
+    "example": "ts-node example.ts",
+    "worker": "ts-node worker.ts"
+  },
+  "keywords": [
+    "redis",
+    "threading",
+    "workers",
+    "multithreading",
+    "task-queue",
+    "distributed",
+    "concurrency",
+    "typescript",
+    "nodejs"
+  ],
+  "author": "Anthonin Colas",
+  "license": "MIT",
+  "dependencies": {
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "~9.17",
-    "@types/eslint__js": "~8.42",
-    "@types/node": "~20",
-    "@typescript-eslint/parser": "~8.19",
-    "@vitest/coverage-v8": "~2.1",
-    "@vitest/eslint-plugin": "~1.1",
-    "eslint-config-prettier": "~9.1",
-    "eslint": "~9.17",
-    "globals": "~15.14",
-    "prettier": "~3.4",
-    "rimraf": "~6.0",
-    "ts-api-utils": "~2.0",
-    "typescript-eslint": "~8.19",
-    "typescript": "~5.7",
-    "vitest": "~2.1"
+    "@types/jest": "^29.5.3",
+    "@types/node": "^20.4.5",
+    "@types/uuid": "^9.0.2",
+    "@typescript-eslint/eslint-plugin": "^6.2.0",
+    "@typescript-eslint/parser": "^6.2.0",
+    "eslint": "^8.46.0",
+    "eslint-config-prettier": "^8.9.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.1",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
   },
-  "scripts": {
-    "start": "node build/src/main.js",
-    "clean": "rimraf coverage build tmp",
-    "prebuild": "npm run lint",
-    "build": "tsc -p tsconfig.json",
-    "build:watch": "tsc -w -p tsconfig.json",
-    "build:release": "npm run clean && tsc -p tsconfig.release.json",
-    "lint": "eslint .",
-    "test": "vitest run unit --config __tests__/vitest.config.ts",
-    "test:coverage": "vitest run unit --config __tests__/vitest.config.ts --coverage.enabled --coverage.all",
-    "prettier": "prettier \"{src,__{tests}__}/**/*.{ts,mts}\" --config .prettierrc --write",
-    "prettier:check": "prettier \"{src,__{tests}__}/**/*.{ts,mts}\" --config .prettierrc --check",
-    "test:watch": "vitest unit"
-  },
-  "author": "Jakub Synowiec <jsynowiec@users.noreply.github.com>",
-  "license": "Apache-2.0",
-  "dependencies": {
-    "tslib": "~2.8"
-  },
-  "volta": {
-    "node": "22.12.0"
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
