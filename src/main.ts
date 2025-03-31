@@ -1,3 +1,4 @@
+import { Redis } from 'ioredis';
 import { cpus } from 'os';
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
@@ -53,12 +54,16 @@ export class RedisThreading extends EventEmitter {
         maxWorkers: config.workerPool?.maxWorkers || cpus().length * 2,
         idleTimeout: config.workerPool?.idleTimeout || 60000,
         taskTimeout: config.workerPool?.taskTimeout || 30000,
-        ...(config.workerPool || {})
+        ...(config.workerPool || {}),
       },
       namespace: config.namespace || 'rt',
       logLevel: config.logLevel || 'info',
-      shutdownTimeout: config.shutdownTimeout || 10000
+      shutdownTimeout: config.shutdownTimeout || 10000,
     };
+  }
+
+  public getRedisClient(): Redis {
+    return RedisClientFactory.getInstance().getClient(this.config.redis);
   }
 
   /**
@@ -83,7 +88,7 @@ export class RedisThreading extends EventEmitter {
       this.queueManager = QueueManager.getInstance(this.config.redis, this.config.namespace);
 
       // Initialiser le moniteur de santé
-      this.healthMonitor = new HealthMonitor(10000, this.nodeId);
+      this.healthMonitor = new HealthMonitor(180000, this.nodeId);
       this.healthMonitor.connectToSharedState(this.sharedState);
 
       // Configurer le moniteur de santé
@@ -104,7 +109,7 @@ export class RedisThreading extends EventEmitter {
           hostname: require('os').hostname(),
           pid: process.pid,
           startTime: Date.now(),
-          version: require('../package.json').version
+          version: require('../package.json').version,
         },
         { ttl: 60 } // Expire après 60 secondes si pas de mise à jour
       );
@@ -155,16 +160,12 @@ export class RedisThreading extends EventEmitter {
 
     this.logger.info(`Initializing worker pool with script: ${absolutePath}`);
 
-    this.workerPool = WorkerPool.getInstance(
-      absolutePath,
-      this.config.workerPool,
-      {
-        ...workerData,
-        nodeId: this.nodeId,
-        redisConfig: this.config.redis,
-        namespace: this.config.namespace
-      }
-    );
+    this.workerPool = WorkerPool.getInstance(absolutePath, this.config.workerPool, {
+      ...workerData,
+      nodeId: this.nodeId,
+      redisConfig: this.config.redis,
+      namespace: this.config.namespace,
+    });
 
     // Configurer les événements du worker pool
     this.workerPool.on('worker:error', (data) => {
@@ -191,10 +192,7 @@ export class RedisThreading extends EventEmitter {
   /**
    * Démarre la consommation de tâches depuis Redis
    */
-  public startQueueConsumer(
-    concurrency: number = 2,
-    queueNames: string[] = ['default']
-  ): void {
+  public startQueueConsumer(concurrency: number = 2, queueNames: string[] = ['default']): void {
     if (!this.isInitialized) {
       throw new Error('RedisThreading must be initialized first');
     }
@@ -203,7 +201,9 @@ export class RedisThreading extends EventEmitter {
       throw new Error('Queue manager is not initialized');
     }
 
-    this.logger.info(`Starting queue consumer with concurrency ${concurrency} for queues: ${queueNames.join(', ')}`);
+    this.logger.info(
+      `Starting queue consumer with concurrency ${concurrency} for queues: ${queueNames.join(', ')}`
+    );
 
     // Configurer les événements du queue manager
     this.queueManager.on('task:completed', (result) => {
@@ -256,10 +256,10 @@ export class RedisThreading extends EventEmitter {
       type: taskType,
       data,
       options: {
-        timeout: options?.timeout
+        timeout: options?.timeout,
       },
       createdAt: Date.now(),
-      status: TaskStatus.PENDING
+      status: TaskStatus.PENDING,
     };
 
     this.logger.debug(`Executing task ${task.id} of type ${taskType} locally`);
@@ -284,17 +284,16 @@ export class RedisThreading extends EventEmitter {
       throw new Error('Queue manager is not initialized');
     }
 
-    this.logger.debug(`Enqueuing task of type ${taskType} to queue ${options?.queueName || 'default'}`);
+    this.logger.debug(
+      `Enqueuing task of type ${taskType} to queue ${options?.queueName || 'default'}`
+    );
     return this.queueManager.enqueue<TInput, TOutput>(taskType, data, options);
   }
 
   /**
    * S'abonne à un canal de message
    */
-  public subscribeToChannel<T = any>(
-    channel: string,
-    handler: (data: T) => void
-  ): () => void {
+  public subscribeToChannel<T = any>(channel: string, handler: (data: T) => void): () => void {
     if (!this.messageBroker) {
       throw new Error('Message broker is not initialized');
     }
@@ -306,12 +305,20 @@ export class RedisThreading extends EventEmitter {
   }
 
   /**
+   * Se désabonne d'un canal de message
+   */
+  public async unsubscribeFromChannel(channel: string): Promise<void> {
+    if (!this.messageBroker) {
+      throw new Error('Message broker is not initialized');
+    }
+    this.logger.debug(`Unsubscribing from channel: ${channel}`);
+    await this.messageBroker.unsubscribe(channel);
+  }
+
+  /**
    * Publie un message sur un canal
    */
-  public async publishToChannel<T = any>(
-    channel: string,
-    data: T
-  ): Promise<void> {
+  public async publishToChannel<T = any>(channel: string, data: T): Promise<void> {
     if (!this.messageBroker) {
       throw new Error('Message broker is not initialized');
     }
@@ -368,16 +375,13 @@ export class RedisThreading extends EventEmitter {
   /**
    * S'abonne aux changements d'une clé dans l'état partagé
    */
-  public onStateChange<T = any>(
-    key: string,
-    callback: (value: T | null) => void
-  ): () => void {
+  public onStateChange<T = any>(key: string, callback: (value: T | null) => void): () => void {
     if (!this.sharedState) {
       throw new Error('Shared state is not initialized');
     }
 
     // Obtenir la valeur initiale
-    this.sharedState.get<T>(key).then(value => {
+    this.sharedState.get<T>(key).then((value) => {
       callback(value);
     });
 
@@ -401,10 +405,7 @@ export class RedisThreading extends EventEmitter {
   /**
    * Acquiert un verrou distribué
    */
-  public async acquireLock(
-    lockName: string,
-    ttl: number = 30
-  ): Promise<boolean> {
+  public async acquireLock(lockName: string, ttl: number = 30): Promise<boolean> {
     if (!this.sharedState) {
       throw new Error('Shared state is not initialized');
     }
@@ -455,7 +456,7 @@ export class RedisThreading extends EventEmitter {
   }> {
     const stats: any = {
       nodeId: this.nodeId,
-      health: this.healthMonitor ? this.healthMonitor.getLatestMetrics() : null
+      health: this.healthMonitor ? this.healthMonitor.getLatestMetrics() : null,
     };
 
     // Stats du worker pool
@@ -537,7 +538,7 @@ export {
   WorkerPoolConfig,
   RedisThreadingConfig,
   Logger,
-  Serializer
+  Serializer,
 };
 
 // Export default

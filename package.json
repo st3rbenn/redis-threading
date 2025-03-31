@@ -1,9 +1,9 @@
 {
   "name": "redis-threading",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Bibliothèque de multithreading avec Redis pour Node.js/TypeScript",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
   "scripts": {
     "clean": "rimraf dist",
     "lint": "eslint --ext .ts src/",
@@ -11,7 +11,8 @@
     "test": "vitest",
     "prepare": "bun run build",
     "example": "ts-node example.ts",
-    "worker": "ts-node worker.ts"
+    "worker": "ts-node worker.ts",
+    "build": "tsc --outDir dist"
   },
   "keywords": [
     "redis",
@@ -29,6 +30,9 @@
   "dependencies": {
     "uuid": "^9.0.0"
   },
+  "files": [
+    "dist/**/*"
+  ],
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.5",

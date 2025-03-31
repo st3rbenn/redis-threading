@@ -17,11 +17,14 @@ export class MessageBroker extends EventEmitter {
   private subscriberClient: Redis;
   private logger: Logger;
   private handlers: Map<string, Set<MessageHandler>> = new Map();
-  private replyHandlers: Map<string, {
-    resolve: (value: any) => void;
-    reject: (reason?: any) => void;
-    timeout: NodeJS.Timeout;
-  }> = new Map();
+  private replyHandlers: Map<
+    string,
+    {
+      resolve: (value: any) => void;
+      reject: (reason?: any) => void;
+      timeout: NodeJS.Timeout;
+    }
+  > = new Map();
   private nodeId: string;
   private isShuttingDown: boolean = false;
 
@@ -172,6 +175,22 @@ export class MessageBroker extends EventEmitter {
   }
 
   /**
+   * Se désabonne d'un canal
+   */
+  public async unsubscribe(channel: string): Promise<void> {
+    const fullChannel = `${this.namespace}:${channel}`;
+    const handlers = this.handlers.get(channel);
+    if (handlers) {
+      handlers.clear();
+      this.handlers.delete(channel);
+      await this.subscriberClient.unsubscribe(fullChannel);
+      this.logger.debug(`Unsubscribed from channel: ${fullChannel}`);
+    } else {
+      this.logger.warn(`No handlers found for channel: ${channel}`);
+    }
+  }
+
+  /**
    * Publie un message sur un canal
    */
   public async publish<T = any>(channel: string, data: T): Promise<void> {
@@ -182,13 +201,10 @@ export class MessageBroker extends EventEmitter {
       channel,
       data,
       timestamp: Date.now(),
-      sender: this.nodeId
+      sender: this.nodeId,
     };
 
-    await this.publisherClient.publish(
-      fullChannel,
-      Serializer.serialize(message)
-    );
+    await this.publisherClient.publish(fullChannel, Serializer.serialize(message));
 
     this.logger.debug(`Published message to channel ${fullChannel}`);
   }
@@ -210,7 +226,7 @@ export class MessageBroker extends EventEmitter {
       data,
       timestamp: Date.now(),
       sender: this.nodeId,
-      replyTo: `reply:${this.nodeId}`
+      replyTo: `reply:${this.nodeId}`,
     };
 
     // Créer une promesse qui sera résolue lorsque la réponse arrivera
@@ -225,10 +241,7 @@ export class MessageBroker extends EventEmitter {
       this.replyHandlers.set(messageId, { resolve, reject, timeout: timeoutId });
 
       // Publier la requête
-      this.publisherClient.publish(
-        fullChannel,
-        Serializer.serialize(message)
-      ).catch(err => {
+      this.publisherClient.publish(fullChannel, Serializer.serialize(message)).catch((err) => {
         clearTimeout(timeoutId);
         this.replyHandlers.delete(messageId);
         reject(err);
@@ -253,13 +266,10 @@ export class MessageBroker extends EventEmitter {
       channel: message.replyTo,
       data,
       timestamp: Date.now(),
-      sender: this.nodeId
+      sender: this.nodeId,
     };
 
-    await this.publisherClient.publish(
-      replyChannel,
-      Serializer.serialize(replyMessage)
-    );
+    await this.publisherClient.publish(replyChannel, Serializer.serialize(replyMessage));
 
     this.logger.debug(`Replied to message ${message.id} on channel ${replyChannel}`);
   }
@@ -280,8 +290,9 @@ export class MessageBroker extends EventEmitter {
     }
 
     // Se désabonner de tous les canaux
-    const channels = Array.from(this.handlers.keys())
-      .map(channel => `${this.namespace}:${channel}`);
+    const channels = Array.from(this.handlers.keys()).map(
+      (channel) => `${this.namespace}:${channel}`
+    );
 
     channels.push(`${this.namespace}:reply:${this.nodeId}`);
 
